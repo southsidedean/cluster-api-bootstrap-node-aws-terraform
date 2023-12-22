@@ -1,34 +1,33 @@
 # -------------------------
-# Bastion-only lab deployment for DKP CAPI deployments
-# Ubuntu 20.04
+# Bootstrap AWS deployment for CAPI cluster deployments
+# Ubuntu 22.04
 # Tom Dean
-# D2iQ
-# Last updated 8/9/2022
+# Last updated 12/22/2023
 # -------------------------
 
 # -------------------------
-# Bastion/Lab Variables
+# Bootstrap Variables
 # Change these values here!!
 # -------------------------
 
-variable "bastion_instance_type" {
+variable "bootstrap_instance_type" {
   type    = string
   default = "t3.large"
 }
 
-variable "bastion_ami" {
+variable "bootstrap_ami" {
   type    = string
-  default = "ami-00e8c38e4908d08ce"
+  default = "ami-id"
 }
 
-variable "bastion_key" {
+variable "bootstrap_key" {
   type    = string
-  default = "cs-key"
+  default = "bs-key"
 }
 
 variable "aws_region" {
   type    = string
-  default = "us-west-2"
+  default = "us-east-2"
 }
 
 variable "subnet_range" {
@@ -43,12 +42,12 @@ variable "route_destination_cidr_block" {
 
 variable "class_name" {
   type    = string
-  default = "dka200"
+  default = "CAPI"
 }
 
 variable "owner" {
   type    = string
-  default = "D2iQ Education"
+  default = "USER"
 }
 
 # -------------------------
@@ -107,8 +106,7 @@ output "cs-key-data" {
 data "aws_caller_identity" "current" {}
 
 # -------------------------
-# DKP IAM Roles/Policies/Instance Profiles for CAPI AWS Deployments
-# Per https://docs.d2iq.com/dkp/konvoy/2.2/choose-infrastructure/aws/iam-policies/
+# IAM Roles/Policies/Instance Profiles for CAPI AWS Deployments
 # -------------------------
 # Create instance-assume-role-policy
 # We will need this to create the IAM Roles
@@ -464,8 +462,7 @@ resource "aws_iam_role_policy_attachment" "AWSIAMPolicyAttachmentNodes" {
 }
 
 # -------------------------
-# DKP Minimal Permissions and Role to Create Clusters For Bootstrap Nodes
-# Per https://docs.d2iq.com/dkp/konvoy/2.2/choose-infrastructure/aws/advanced/permissions_role_create_cluster/
+# Minimal Permissions and Role to Create Clusters For Bootstrap Nodes
 # -------------------------
 # The following is a Terraform stack that creates:
 #   - A policy named dkp-bootstrapper-policy that enumerates the minimal permissions for a user that can create dkp aws clusters.
@@ -845,15 +842,15 @@ resource "aws_security_group" "course_elb" {
 }
 
 # -------------------------
-# Bastion Instance
+# bootstrap Instance
 # -------------------------
 
-resource "aws_instance" "bastion" {
+resource "aws_instance" "bootstrap" {
   count         = 1
-  ami           = var.bastion_ami
-  instance_type = var.bastion_instance_type
+  ami           = var.bootstrap_ami
+  instance_type = var.bootstrap_instance_type
   subnet_id     = aws_subnet.course_subnet.id
-  key_name      = var.bastion_key
+  key_name      = var.bootstrap_key
   vpc_security_group_ids = [
     aws_security_group.common.id,
     aws_security_group.course_ssh.id
@@ -867,7 +864,7 @@ resource "aws_instance" "bastion" {
   }
 
   tags = {
-    Name            = "${var.class_name}-${local.cluster_name}-bastion",
+    Name            = "${var.class_name}-${local.cluster_name}-bootstrap",
     Cluster         = local.cluster_name,
     Class           = var.class_name,
     ci-key-username = "ubuntu"
@@ -883,7 +880,5 @@ echo "${tls_private_key.student_key.private_key_pem}" > /home/ubuntu/student_key
 echo "${tls_private_key.student_key.public_key_pem}" > /home/ubuntu/student_key.pub
 chmod 600 /home/ubuntu/student_key.pem
 chown ubuntu:ubuntu /home/ubuntu/student_key.*
-docker pull d2iqeducation/dka200-workbook:latest
-docker run --restart=always -d -p 8080:80 d2iqeducation/dka200-workbook:latest
 EOF
 }
